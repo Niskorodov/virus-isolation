@@ -41,31 +41,32 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
         if not paths:
             break
 
-        # выбираем ближайший шлюз и путь лексикографически
-        paths.sort(key=lambda p: (p[-1], p))
-        path = paths[0]
+            # выбираем ближайший шлюз и путь лексикографически
+            paths.sort(key=lambda p: (p[-1], p))
+            path = paths[0]
 
-        gate = path[-1]
-        if len(path) == 1:
-            node = virus
-        else:
-            node = path[-2]
+            gate = path[-1]
+            node = path[-2] if len(path) > 1 else virus
 
-        if gate.islower():
-            gate, node = node, gate
+            if gate.islower():
+                gate, node = node, gate
 
-        cut = f"{gate}-{node}"
-        result.append(cut)
+            cut = f"{gate}-{node}"
+            result.append(cut)
 
-        # отключаем коридор
-        graph[gate].discard(node)
-        graph[node].discard(gate)
+            # отключаем коридор
+            graph[gate].discard(node)
+            graph[node].discard(gate)
 
-        # если есть путь — вирус движется на следующий узел
-        if len(path) > 1:
-            virus = path[0]
-        else:
-            break
+            # вирус двигается, если не был прямо у шлюза
+            if len(path) > 1:
+                virus = path[0]
+            else:
+                # вирус стоял у шлюза — значит, после разрыва ему двигаться некуда
+                # проверим, остались ли вообще пути до шлюзов
+                active = any(any(n.isupper() for n in graph[k]) for k in graph if k.islower())
+                if not active:
+                    break
 
         # если больше нет соединений с шлюзами — стоп
         if not any(x.isupper() for k in graph for x in graph[k]):
