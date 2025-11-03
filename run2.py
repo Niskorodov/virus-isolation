@@ -1,6 +1,5 @@
 import sys
-from collections import defaultdict, deque
-
+from collections import deque, defaultdict
 
 def solve(edges: list[tuple[str, str]]) -> list[str]:
     graph = defaultdict(set)
@@ -11,11 +10,11 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
     virus = 'a'
     result = []
 
-    def bfs(start):
-        """Возвращает список путей до всех шлюзов минимальной длины"""
+    def shortest_path_to_gate(start):
+        """Возвращает кратчайший путь от вируса до ближайшего шлюза"""
         q = deque([(start, [])])
         visited = {start}
-        gates = []
+        paths = []
         min_len = None
 
         while q:
@@ -25,51 +24,45 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
                     continue
                 visited.add(nxt)
                 new_path = path + [nxt]
+
                 if nxt.isupper():
                     # нашли шлюз
                     if min_len is None or len(new_path) < min_len:
                         min_len = len(new_path)
-                        gates = [new_path]
+                        paths = [new_path]
                     elif len(new_path) == min_len:
-                        gates.append(new_path)
+                        paths.append(new_path)
                 else:
                     q.append((nxt, new_path))
-        return gates
+        if not paths:
+            return None
+        # выбираем путь лексикографически по последнему элементу (имени шлюза)
+        paths.sort(key=lambda p: (p[-1], p))
+        return paths[0]
 
     while True:
-        paths = bfs(virus)
-        if not paths:
+        path = shortest_path_to_gate(virus)
+        if not path:
             break
-
-        # выбираем ближайший шлюз и путь лексикографически
-        paths.sort(key=lambda p: (p[-1], p))
-        path = paths[0]
 
         gate = path[-1]
         node = path[-2] if len(path) > 1 else virus
 
-        if gate.islower():
-            gate, node = node, gate
-
+        # отключаем шлюз от узла
         cut = f"{gate}-{node}"
         result.append(cut)
-
-        # отключаем коридор
         graph[gate].discard(node)
         graph[node].discard(gate)
 
-        # вирус двигается, если не был прямо у шлюза
+        # если остались соединения со шлюзами — вирус двигается дальше
         if len(path) > 1:
             virus = path[0]
         else:
-            # вирус стоял у шлюза — значит, после разрыва ему двигаться некуда
-            # проверим, остались ли вообще пути до шлюзов
-            active = any(any(n.isupper() for n in graph[k]) for k in graph if k.islower())
-            if not active:
-                break
+            break
 
-        # если больше нет соединений с шлюзами — стоп
-        if not any(x.isupper() for k in graph for x in graph[k]):
+        # если больше нет путей до шлюзов — стоп
+        active = any(n.isupper() for k in graph for n in graph[k])
+        if not active:
             break
 
     return result
@@ -84,8 +77,9 @@ def main():
         a, _, b = line.partition('-')
         edges.append((a, b))
 
-    for res in solve(edges):
-        print(res)
+    res = solve(edges)
+    for r in res:
+        print(r)
 
 
 if __name__ == "__main__":
