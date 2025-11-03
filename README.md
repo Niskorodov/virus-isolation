@@ -26,3 +26,5 @@ Get-Content input_depth2.txt | python run.py
 
 ```bash
 Get-Content input_virus.txt | python run2.py
+Get-Content input_virus2.txt | python run2.py
+Get-Content input_virus3.txt | python run2.py
