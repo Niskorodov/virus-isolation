@@ -11,11 +11,13 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
     result = []
 
     while True:
+
         q = deque([(virus, [])])
         visited = {virus}
-        path_to_gate = None
+        paths = []
+        min_len = None
 
-        while q and not path_to_gate:
+        while q:
             node, path = q.popleft()
             for nxt in sorted(graph[node]):
                 if nxt in visited:
@@ -23,23 +25,29 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
                 visited.add(nxt)
                 new_path = path + [nxt]
                 if nxt.isupper():
-                    path_to_gate = new_path
-                    break
-                q.append((nxt, new_path))
 
-        if not path_to_gate:
+                    if min_len is None or len(new_path) == min_len:
+                        min_len = len(new_path)
+                        paths.append(new_path)
+                    elif len(new_path) < min_len:
+                        min_len = len(new_path)
+                        paths = [new_path]
+                else:
+                    q.append((nxt, new_path))
+
+        if not paths:
             break
 
 
-        if len(path_to_gate) == 1:
-            gate = path_to_gate[0]
-            cut = f"{gate}-{virus}"
-        else:
-            gate = path_to_gate[-1]
-            node = path_to_gate[-2]
-            if gate.islower():
-                gate, node = node, gate
-            cut = f"{gate}-{node}"
+        paths.sort(key=lambda p: (p[-1], p))
+        path_to_gate = paths[0]
+
+
+        gate = path_to_gate[-1]
+        node = path_to_gate[-2] if len(path_to_gate) > 1 else virus
+        if gate.islower():
+            gate, node = node, gate
+        cut = f"{gate}-{node}"
 
         result.append(cut)
         g, n = cut.split('-')
@@ -47,10 +55,12 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
         graph[n].discard(g)
 
 
-        if len(path_to_gate) > 1:
-            virus = path_to_gate[0]
-        else:
-            break
+        virus = path_to_gate[0] if len(path_to_gate) > 1 else virus
+
+
+        if not any(c.isupper() for c in graph[virus]):
+            if not any(any(x.isupper() for x in graph[k]) for k in graph if k.islower()):
+                break
 
     return result
 
