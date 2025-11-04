@@ -1,74 +1,165 @@
 import sys
-from collections import defaultdict, deque
+from collections import deque, defaultdict
 
 
 def solve(edges: list[tuple[str, str]]) -> list[str]:
-    # Граф
-    graph = defaultdict(set)
-    for a, b in edges:
-        graph[a].add(b)
-        graph[b].add(a)
+    """
+    Решение задачи об изоляции вируса
 
-    def shortest_path_from(start: str) -> list[str] | None:
-        """
-        Кратчайший путь от start до любого шлюза (A..Z),
-        с лексикографическими тай-брейками:
-          - сначала по букве шлюза,
-          - затем по самому пути (A..Z, a..z).
-        Возвращает путь как список вершин БЕЗ стартовой: [next, ..., GATE]
-        или None, если шлюзы недостижимы.
-        """
-        q = deque([(start, [])])
-        visited = {start}
-        best_len = None
-        paths = []
+    Args:
+        edges: список коридоров в формате (узел1, узел2)
 
-        while q:
-            node, path = q.popleft()
-            for nxt in sorted(graph[node]):  # лексикографический порядок соседей
-                if nxt in visited:
-                    continue
-                visited.add(nxt)
-                new_path = path + [nxt]
-                if nxt.isupper():  # попали в шлюз
-                    if best_len is None or len(new_path) < best_len:
-                        best_len = len(new_path)
-                        paths = [new_path]
-                    elif len(new_path) == best_len:
-                        paths.append(new_path)
-                else:
-                    # продолжаем искать через обычные узлы
-                    q.append((nxt, new_path))
+    Returns:
+        список отключаемых коридоров в формате "Шлюз-узел"
+    """
 
-        if not paths:
+    # Строим граф
+    graph = defaultdict(list)
+    gateways = set()
+    nodes = set()
+
+    for u, v in edges:
+        graph[u].append(v)
+        graph[v].append(u)
+        nodes.add(u)
+        nodes.add(v)
+        # Определяем шлюзы (заглавные буквы)
+        if u.isupper():
+            gateways.add(u)
+        if v.isupper():
+            gateways.add(v)
+
+    # Начальная позиция вируса
+    virus_pos = 'a'
+    result = []
+
+    # Функция для поиска кратчайшего пути к шлюзам
+    def find_virus_path(current_pos):
+        # BFS для поиска кратчайшего пути до любого шлюза
+        queue = deque([(current_pos, [current_pos])])
+        visited = {current_pos}
+
+        while queue:
+            node, path = queue.popleft()
+
+            # Если достигли шлюза
+            if node in gateways:
+                return path
+
+            # Сортируем соседей для детерминированности
+            for neighbor in sorted(graph[node]):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append((neighbor, path + [neighbor]))
+
+        return None
+
+    # Функция для определения следующего хода вируса
+    def get_virus_move(current_pos):
+        # Находим все шлюзы и их расстояния
+        distances = {}
+        for gateway in sorted(gateways):  # Сортируем для детерминированности
+            # BFS для поиска расстояния до шлюза
+            queue = deque([(current_pos, 0)])
+            visited = {current_pos}
+            found = False
+
+            while queue and not found:
+                node, dist = queue.popleft()
+                if node == gateway:
+                    distances[gateway] = dist
+                    found = True
+                    break
+
+                for neighbor in sorted(graph[node]):
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        queue.append((neighbor, dist + 1))
+
+        if not distances:
             return None
 
-        # Выбираем путь: сперва по шлюзу, затем по самому пути
-        paths.sort(key=lambda p: (p[-1], p))
-        return paths[0]
+        # Находим минимальное расстояние
+        min_dist = min(distances.values())
 
-    virus = 'a'
-    result: list[str] = []
+        # Выбираем шлюз с минимальным расстоянием (лексикографически первый при равенстве)
+        target_gateway = min(gw for gw, dist in distances.items() if dist == min_dist)
 
+        # Находим следующий узел на пути к целевому шлюзу
+        # BFS для построения пути
+        queue = deque([(current_pos, [current_pos])])
+        visited = {current_pos}
+
+        while queue:
+            node, path = queue.popleft()
+
+            if node == target_gateway:
+                # Возвращаем следующий узел после current_pos
+                return path[1] if len(path) > 1 else None
+
+            for neighbor in sorted(graph[node]):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append((neighbor, path + [neighbor]))
+
+        return None
+
+    # Основной цикл игры
     while True:
-        # Считаем путь ДО разреза
-        path = shortest_path_from(virus)
-        if not path:
-            break  # шлюзы недостижимы — всё, готово
+        # 1. Находим все возможные отключаемые коридоры (шлюз-узел)
+        possible_cuts = []
+        for gateway in gateways:
+            for neighbor in sorted(graph[gateway]):
+                if neighbor.islower():  # Только обычные узлы
+                    possible_cuts.append((gateway, neighbor))
 
-        gate = path[-1]
-        node = path[-2] if len(path) > 1 else virus  # сосед шлюза (всегда строчная)
+        # Сортируем для лексикографического порядка
+        possible_cuts.sort()
 
-        # Разрезаем
-        result.append(f"{gate}-{node}")
-        graph[gate].discard(node)
-        graph[node].discard(gate)
+        # 2. Пытаемся найти отключение, которое не приведет к немедленному поражению
+        best_cut = None
 
+        for gateway, node in possible_cuts:
+            # Временно удаляем этот коридор
+            graph[gateway].remove(node)
+            graph[node].remove(gateway)
 
-        new_path = shortest_path_from(virus)
-        if not new_path:
-            break  # больше путей к шлюзам нет
-        virus = new_path[0]  # один шаг к новому ближайшему шлюзу
+            # Проверяем, может ли вирус достичь шлюза
+            path = find_virus_path(virus_pos)
+
+            # Если вирус не может достичь шлюза или это безопасное отключение
+            if path is None:
+                best_cut = (gateway, node)
+                # Не восстанавливаем граф - это наш выбор
+                break
+            else:
+                # Восстанавливаем граф
+                graph[gateway].append(node)
+                graph[node].append(gateway)
+
+        # Если не нашли безопасного отключения, берем первое возможное
+        if best_cut is None and possible_cuts:
+            best_cut = possible_cuts[0]
+            gateway, node = best_cut
+            graph[gateway].remove(node)
+            graph[node].remove(gateway)
+
+        if best_cut is None:
+            break
+
+        gateway, node = best_cut
+        result.append(f"{gateway}-{node}")
+
+        # 3. Вирус делает ход
+        next_pos = get_virus_move(virus_pos)
+        if next_pos is None:
+            break  # Вирус заблокирован
+
+        virus_pos = next_pos
+
+        # 4. Проверяем, не достиг ли вирус шлюза
+        if virus_pos in gateways:
+            break
 
     return result
 
@@ -77,13 +168,15 @@ def main():
     edges = []
     for line in sys.stdin:
         line = line.strip()
-        if not line:
-            continue
-        a, _, b = line.partition('-')
-        edges.append((a, b))
+        if line:
+            # Разбираем строку вида "узел1-узел2"
+            parts = line.split('-')
+            if len(parts) == 2:
+                edges.append((parts[0], parts[1]))
 
-    for cut in solve(edges):
-        print(cut)
+    result = solve(edges)
+    for edge in result:
+        print(edge)
 
 
 if __name__ == "__main__":
