@@ -64,7 +64,7 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
         graph[gate].discard(node)
         graph[node].discard(gate)
 
-        # После разреза вирус переоценивает цель и делает шаг
+
         new_path = shortest_path_from(virus)
         if not new_path:
             break  # больше путей к шлюзам нет
